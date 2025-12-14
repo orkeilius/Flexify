@@ -17,7 +17,6 @@ class GraphTile extends StatelessWidget {
   final Set<String> selected;
   final Function(String) onSelect;
   final TabController tabCtrl;
-  final bool timeBasedXAxis; // new flag to control x-axis behaviour
 
   const GraphTile({
     super.key,
@@ -25,7 +24,6 @@ class GraphTile extends StatelessWidget {
     required this.onSelect,
     required this.gymSet,
     required this.tabCtrl,
-    this.timeBasedXAxis = false,
   });
 
   @override
