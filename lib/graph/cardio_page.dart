@@ -21,12 +21,14 @@ class CardioPage extends StatefulWidget {
   final String name;
   final String unit;
   final List<CardioData> data;
+  final bool timeBasedXAxis;
 
   const CardioPage({
     super.key,
     required this.name,
     required this.unit,
     required this.data,
+    this.timeBasedXAxis = false,
   });
 
   @override
@@ -42,6 +44,7 @@ class _CardioPageState extends State<CardioPage> {
   DateTime? end;
   TabController? ctrl;
   DateTime lastTap = DateTime(0);
+  bool useTimeBasedXAxis = false;
 
   LineTouchTooltipData tooltipData(String format) => LineTouchTooltipData(
         getTooltipColor: (touch) => Theme.of(context).colorScheme.surface,
@@ -131,6 +134,36 @@ class _CardioPageState extends State<CardioPage> {
         ),
         actions: [
           IconButton(
+            onPressed: () async {
+              final gymSets = await (db.gymSets.select()
+                ..orderBy(
+                  [
+                        (u) => OrderingTerm(
+                      expression: u.created,
+                      mode: OrderingMode.desc,
+                    ),
+                  ],
+                )
+                ..where((tbl) => tbl.name.equals(widget.name))
+                ..where((tbl) => tbl.hidden.equals(false))
+                ..limit(20))
+                  .get();
+              if (!context.mounted) return;
+
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => GraphHistoryPage(
+                    name: widget.name,
+                    gymSets: gymSets,
+                  ),
+                ),
+              );
+              Timer(kThemeAnimationDuration, setData);
+            },
+            icon: const Icon(Icons.history),
+            tooltip: "History",
+          ),
+          IconButton(
             onPressed: () {
               Navigator.push(
                 context,
@@ -156,7 +189,11 @@ class _CardioPageState extends State<CardioPage> {
             for (var index = 0; index < rows.length; index++) {
               final row = rows.elementAt(index);
               final value = double.parse(row.value.toStringAsFixed(1));
-              spots.add(FlSpot(index.toDouble(), value));
+              if (useTimeBasedXAxis) {
+                spots.add(FlSpot(row.created.millisecondsSinceEpoch.toDouble(), value));
+              } else {
+                spots.add(FlSpot(index.toDouble(), value));
+              }
             }
 
             final settings = context.watch<SettingsState>().value;
@@ -306,6 +343,13 @@ class _CardioPageState extends State<CardioPage> {
                   ],
                 ),
                 SizedBox(height: 8),
+                SwitchListTile(
+                  title: const Text('Use time-based X axis'),
+                  value: useTimeBasedXAxis,
+                  onChanged: (val) => setState(() {
+                    useTimeBasedXAxis = val;
+                  }),
+                ),
                 if (rows.isEmpty)
                   ListTile(
                     title: Text("No data yet for ${widget.name}"),
@@ -324,6 +368,7 @@ class _CardioPageState extends State<CardioPage> {
                             tooltipData(settings.shortDateFormat),
                         touchLine: touchLine,
                         data: data,
+                        timeBasedXAxis: useTimeBasedXAxis,
                       ),
                     ),
                   ),
@@ -332,36 +377,6 @@ class _CardioPageState extends State<CardioPage> {
             );
           },
         ),
-      ),
-      floatingActionButton: AnimatedFab(
-        onPressed: () async {
-          final gymSets = await (db.gymSets.select()
-                ..orderBy(
-                  [
-                    (u) => OrderingTerm(
-                          expression: u.created,
-                          mode: OrderingMode.desc,
-                        ),
-                  ],
-                )
-                ..where((tbl) => tbl.name.equals(widget.name))
-                ..where((tbl) => tbl.hidden.equals(false))
-                ..limit(20))
-              .get();
-          if (!context.mounted) return;
-
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => GraphHistoryPage(
-                name: widget.name,
-                gymSets: gymSets,
-              ),
-            ),
-          );
-          Timer(kThemeAnimationDuration, setData);
-        },
-        icon: const Icon(Icons.history),
-        label: const Text("History"),
       ),
     );
   }
